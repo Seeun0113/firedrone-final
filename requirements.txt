@@ -1,0 +1,12 @@
+pyserial==3.5
+smbus2==0.4.2
+numpy>=1.21.0
+opencv-python>=4.5.0
+
+# ROS 관련 패키지는 시스템에 설치된 ROS 배포판 사용
+# rospy, geometry_msgs, sensor_msgs, mavros_msgs
+
+# YOLO 사용 시 추가 (선택)
+# torch>=1.10.0
+# ultralytics>=8.0.0
+
