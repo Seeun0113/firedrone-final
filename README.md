@@ -161,8 +161,8 @@ python3 main.py
 
 ### Phase 2: 감지
 ```
-IR 온도 60°C 이상 + 가스 농도 300ppm 이상
-→ FireDetector 화재 신뢰도 70% 이상
+IR 온도 -10°C 이하 + 가스 농도 350ppm 이상
+→ FireDetector 화재 신뢰도 60% 이상
 → YOLO 화재 bbox 검출 → 좌표 계산
 ```
 
@@ -190,7 +190,7 @@ IR 온도 60°C 이상 + 가스 농도 300ppm 이상
 ### Phase 5: 검증
 ```
 투하 후 3초 대기
-→ IR 온도 < 60°C & YOLO 신뢰도 < 0.2
+→ IR 온도 > 0°C & YOLO 신뢰도 < 0.2
 → 진압 성공! → 다음 목표 탐색
 ```
 
