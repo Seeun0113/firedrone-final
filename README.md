@@ -229,46 +229,5 @@ python3 -c "import serial; s=serial.Serial('/dev/ttyUSB0', 115200); print(s.read
 
 ---
 
-## 📊 성능 지표
-
-- **탐지 정확도**: 95% (멀티센서 퓨전)
-- **투하 정밀도**: ±0.3m (고도 3m, 속도 3m/s 기준)
-- **처리 주기**: 10Hz
-- **검증 시간**: 3초
-
----
-
-## 🔬 향후 개선 사항
-
-- [ ] 멀티 목표 동시 추적
-- [ ] 바람 보정 알고리즘
-- [ ] GPS-RTK 정밀 위치
-- [ ] 자동 재장전 메커니즘
-- [ ] 웹 대시보드 모니터링
-
----
-
-## 📄 라이센스
-
-MIT License
-
----
-
-## 👥 개발자
-
-**FireDrone Project Team**
-
-문의: firedrone@example.com
-
----
-
-## 🙏 감사의 말
-
-- PX4 Autopilot Team
-- MAVROS Developers
-- Ultralytics YOLO Team
-
----
-
-**🔥 화재로부터 안전한 세상을 만듭니다! 🚁**
+TEAM 산불을 막아조 🚁
 
