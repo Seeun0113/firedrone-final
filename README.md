@@ -16,7 +16,7 @@
   - MLX90640 IR Array (I2C, 열화상 감지)
   - MQ-2 Gas Sensor (Arduino 연동, 가스 농도)
   - 카메라 (YOLO 화재 검출)
-- **컴퓨터**: Jetson Nano / Raspberry Pi 4
+- **컴퓨터**: Jetson Nano
 
 ### 소프트웨어
 - **ROS Melodic/Noetic**
