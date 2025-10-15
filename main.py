@@ -37,6 +37,9 @@ class FireDroneSystem:
         self.current_state = None
         self.is_armed = False
         
+        # 웨이포인트 컨트롤러 (순회 비행용)
+        self.waypoint_controller = None
+        
         # === ROS 구독자 ===
         self.subscribe_topics()
         
@@ -45,6 +48,8 @@ class FireDroneSystem:
             self.check_takeoff_conditions()
             # 자동 이륙 실행
             self.auto_takeoff()
+            # 이륙 완료 후 순회 비행 시작
+            self.start_waypoint_patrol()
         
         rospy.loginfo("🚁 FireDrone 시스템 초기화 완료")
     
@@ -222,6 +227,54 @@ class FireDroneSystem:
         
         return False
     
+    def start_waypoint_patrol(self):
+        """웨이포인트 순회 비행 시작"""
+        if not config.PATROL_ENABLED:
+            return
+        
+        rospy.loginfo("🚁 웨이포인트 순회 비행 시작...")
+        
+        # 웨이포인트 컨트롤러를 별도 스레드에서 실행
+        import threading
+        from waypoint_controller import WaypointController
+        
+        self.waypoint_controller = WaypointController()
+        patrol_thread = threading.Thread(target=self.waypoint_controller.run)
+        patrol_thread.daemon = True
+        patrol_thread.start()
+    
+    def stop_waypoint_patrol(self):
+        """웨이포인트 순회 비행 중지"""
+        rospy.loginfo("🛑 웨이포인트 순회 비행 중지")
+        if self.waypoint_controller:
+            # OFFBOARD 모드에서 POSHOLD 모드로 전환
+            self.set_mode("POSHOLD")
+    
+    def emergency_land(self):
+        """비상 착륙"""
+        rospy.loginfo("🚨 비상 착륙 시작!")
+        try:
+            # LAND 모드로 전환
+            self.set_mode("LAND")
+            rospy.loginfo("✅ LAND 모드로 전환됨")
+        except Exception as e:
+            rospy.logerr(f"❌ 비상 착륙 실패: {e}")
+    
+    def safe_shutdown(self):
+        """안전한 시스템 종료"""
+        rospy.loginfo("🛑 안전한 시스템 종료 시작...")
+        
+        # 1. 순회 비행 중지
+        self.stop_waypoint_patrol()
+        
+        # 2. POSHOLD 모드로 전환 (호버링)
+        self.set_mode("POSHOLD")
+        
+        # 3. 2초 대기
+        rospy.sleep(2)
+        
+        rospy.loginfo("✅ 안전한 종료 완료")
+    
     def read_sensors(self):
         """센서 값 읽기"""
         # LiDAR
@@ -249,38 +302,47 @@ class FireDroneSystem:
         rate = rospy.Rate(config.ROS_RATE_HZ)
         rospy.loginfo("🔥 메인 루프 시작...")
         
-        while not rospy.is_shutdown():
-            # 1. 센서 읽기
-            dist, ir_temp, gas_value = self.read_sensors()
-            
-            # 2. 화재 감지
-            is_fire, fire_conf = self.fire_detector.detect(ir_temp, gas_value)
-            if is_fire:
-                rospy.loginfo_throttle(2, f"🔥 화재 감지! ({fire_conf:.2%})")
-            
-            # 3. 투하 판단
-            self.controller.compute_drop()
-            
-            # 4. 투하 검증
-            verify_result = self.controller.verify_fire_extinguish(ir_temp, self.yolo_confidence)
-            if verify_result is True:
-                rospy.loginfo("✅ 진압 완료! 다음 목표 탐색...")
-            
-            # 5. 로그 출력 (5초마다)
-            log_str = "📊 "
-            log_str += f"LiDAR={dist:.2f}m " if dist else "LiDAR=N/A "
-            log_str += f"IR={ir_temp:.1f}°C " if ir_temp else "IR=N/A "
-            log_str += f"Gas={gas_value:.0f}ppm " if gas_value else "Gas=N/A "
-            log_str += f"Fire={fire_conf:.1%}"
-            rospy.loginfo_throttle(5, log_str)
-            
-            rate.sleep()
+        try:
+            while not rospy.is_shutdown():
+                # 1. 센서 읽기
+                dist, ir_temp, gas_value = self.read_sensors()
+                
+                # 2. 화재 감지
+                is_fire, fire_conf = self.fire_detector.detect(ir_temp, gas_value)
+                if is_fire:
+                    rospy.loginfo_throttle(2, f"🔥 화재 감지! ({fire_conf:.2%})")
+                
+                # 3. 투하 판단
+                self.controller.compute_drop()
+                
+                # 4. 투하 검증
+                verify_result = self.controller.verify_fire_extinguish(ir_temp, self.yolo_confidence)
+                if verify_result is True:
+                    rospy.loginfo("✅ 진압 완료! 다음 목표 탐색...")
+                
+                # 5. 로그 출력 (5초마다)
+                log_str = "📊 "
+                log_str += f"LiDAR={dist:.2f}m " if dist else "LiDAR=N/A "
+                log_str += f"IR={ir_temp:.1f}°C " if ir_temp else "IR=N/A "
+                log_str += f"Gas={gas_value:.0f}ppm " if gas_value else "Gas=N/A "
+                log_str += f"Fire={fire_conf:.1%}"
+                rospy.loginfo_throttle(5, log_str)
+                
+                rate.sleep()
+                
+        except KeyboardInterrupt:
+            rospy.loginfo("🛑 키보드 인터럽트 감지!")
+            self.safe_shutdown()
+        except Exception as e:
+            rospy.logerr(f"❌ 시스템 오류: {e}")
+            self.emergency_land()
     
     def shutdown(self):
         """종료 처리"""
         rospy.loginfo("🛑 시스템 종료...")
         if self.ser_lidar: self.ser_lidar.close()
         if self.ser_arduino: self.ser_arduino.close()
+        rospy.loginfo("✅ 모든 시리얼 포트 종료 완료")
 
 if __name__ == "__main__":
     try:

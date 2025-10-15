@@ -53,6 +53,18 @@ REQUIRED_LIDAR = False              # LiDAR 필수 여부 (테스트용 비활�
 REQUIRED_ARDUINO = False            # Arduino 필수 여부 (테스트용 비활성화)
 REQUIRED_IR = False                 # IR 센서 필수 여부 (선택)
 
+# === 순회 비행 설정 ===
+PATROL_ENABLED = True                # 순회 비행 활성화
+PATROL_WAYPOINTS = [                 # 순회 경로 (x, y, z)
+    {"x": 0.0, "y": 0.0, "z": 1.0},    # 시작점
+    {"x": 3.0, "y": 0.0, "z": 1.0},    # 웨이포인트 1
+    {"x": 3.0, "y": 3.0, "z": 1.0},    # 웨이포인트 2
+    {"x": 0.0, "y": 3.0, "z": 1.0},    # 웨이포인트 3
+    {"x": 0.0, "y": 0.0, "z": 1.0},    # 복귀
+]
+PATROL_SPEED = 1.0                   # 순회 속도 (m/s)
+PATROL_HOVER_TIME = 2.0              # 각 지점 정지 시간 (초)
+
 # === 아두이노 서보+가스 설정 (Windows) ===
 ARDUINO_SERVO_GAS_PORT = "COM4"      # 실제 포트 확인 필요 (Windows: COM3, COM4 등)
 ARDUINO_SERVO_GAS_BAUDRATE = 9600
