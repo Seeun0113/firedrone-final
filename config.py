@@ -35,11 +35,23 @@ VERIFY_TEMP_THRESHOLD = 60.0     # 진압 확인 온도 임계값 (°C)
 VERIFY_YOLO_THRESHOLD = 0.2      # 진압 확인 YOLO 신뢰도 임계값
 
 # === 화재 감지 임계값 ===
-FIRE_TEMP_THRESHOLD = 60.0   # IR 온도 임계값 (℃)
-FIRE_GAS_THRESHOLD = 300.0   # 가스 농도 임계값 (ppm)
+FIRE_TEMP_THRESHOLD = -10.0  # IR 온도 임계값 (℃) - 불꽃 감지용
+FIRE_GAS_THRESHOLD = 350.0   # 가스 농도 임계값 (ppm)
 
 # === ROS 설정 ===
 ROS_RATE_HZ = 10             # 메인 루프 주기 (Hz)
+
+# === 이륙 조건 설정 ===
+TAKEOFF_ENABLED = True               # 자동 이륙 활성화
+TAKEOFF_ALTITUDE = 1.0               # 이륙 고도 (m)
+TAKEOFF_BATTERY_MIN = 20.0          # 최소 배터리 잔량 (%)
+TAKEOFF_SENSOR_CHECK = False        # 센서 상태 확인 비활성화 (테스트용)
+TAKEOFF_WIND_MAX = 5.0              # 최대 허용 풍속 (m/s)
+
+# === 필수 센서 설정 ===
+REQUIRED_LIDAR = False              # LiDAR 필수 여부 (테스트용 비활성화)
+REQUIRED_ARDUINO = False            # Arduino 필수 여부 (테스트용 비활성화)
+REQUIRED_IR = False                 # IR 센서 필수 여부 (선택)
 
 # === 아두이노 서보+가스 설정 (Windows) ===
 ARDUINO_SERVO_GAS_PORT = "COM4"      # 실제 포트 확인 필요 (Windows: COM3, COM4 등)

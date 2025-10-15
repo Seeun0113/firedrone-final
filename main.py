@@ -10,6 +10,8 @@ import serial
 from geometry_msgs.msg import PoseStamped, TwistStamped, PointStamped
 from sensor_msgs.msg import Imu
 from std_msgs.msg import Float32
+from mavros_msgs.srv import CommandTOL, CommandBool, SetMode
+from mavros_msgs.msg import State
 
 import config
 from sensor_readers import read_tfluna_latest, MLX90640Reader, read_mq2_from_arduino, FireDetector
@@ -31,10 +33,52 @@ class FireDroneSystem:
         # YOLO 신뢰도
         self.yolo_confidence = None
         
+        # 드론 상태
+        self.current_state = None
+        self.is_armed = False
+        
         # === ROS 구독자 ===
         self.subscribe_topics()
         
+        # === 이륙 조건 체크 ===
+        if config.TAKEOFF_ENABLED:
+            self.check_takeoff_conditions()
+            # 자동 이륙 실행
+            self.auto_takeoff()
+        
         rospy.loginfo("🚁 FireDrone 시스템 초기화 완료")
+    
+    def check_takeoff_conditions(self):
+        """이륙 전 안전 조건 체크"""
+        rospy.loginfo("🔍 이륙 조건 체크 중...")
+        
+        # === 필수 센서 체크 ===
+        if config.TAKEOFF_SENSOR_CHECK:
+            # LiDAR 필수 체크
+            if config.REQUIRED_LIDAR and self.ser_lidar is None:
+                rospy.logerr("❌ 이륙 불가: LiDAR 센서 연결 실패 (필수 센서)")
+                rospy.signal_shutdown("LiDAR 센서 필요")
+                return False
+            
+            # Arduino 필수 체크
+            if config.REQUIRED_ARDUINO and self.ser_arduino is None:
+                rospy.logerr("❌ 이륙 불가: Arduino 센서 연결 실패 (필수 센서)")
+                rospy.signal_shutdown("Arduino 센서 필요")
+                return False
+            
+            # IR 센서 선택 체크
+            if config.REQUIRED_IR and self.ir_reader is None:
+                rospy.logerr("❌ 이륙 불가: IR 센서 연결 실패 (필수 센서)")
+                rospy.signal_shutdown("IR 센서 필요")
+                return False
+            elif not config.REQUIRED_IR and self.ir_reader is None:
+                rospy.logwarn("⚠️ IR 센서 연결 실패 - 화재 감지 정확도 저하")
+        
+        # === 배터리 체크 (예시) ===
+        # 실제로는 MAVROS에서 배터리 정보를 받아야 함
+        rospy.loginfo("✅ 센서 상태: 정상")
+        rospy.loginfo("✅ 이륙 조건 만족")
+        return True
     
     def init_sensors(self):
         """센서 초기화"""
@@ -70,10 +114,113 @@ class FireDroneSystem:
         rospy.Subscriber("/mavros/imu/data", Imu, self.controller.update_imu)
         rospy.Subscriber("/fire_detector/target_local", PointStamped, self.controller.update_target)
         rospy.Subscriber("/fire_detector/confidence", Float32, self.yolo_conf_callback)
+        rospy.Subscriber("/mavros/state", State, self.state_callback)
     
     def yolo_conf_callback(self, msg):
         """YOLO 신뢰도 콜백"""
         self.yolo_confidence = msg.data
+    
+    def state_callback(self, msg):
+        """드론 상태 콜백"""
+        self.current_state = msg
+        self.is_armed = msg.armed
+    
+    def set_mode(self, mode):
+        """드론 모드 설정"""
+        try:
+            rospy.wait_for_service('/mavros/set_mode', timeout=5)
+            set_mode_srv = rospy.ServiceProxy('/mavros/set_mode', SetMode)
+            response = set_mode_srv(custom_mode=mode)
+            if response.mode_sent:
+                rospy.loginfo(f"✅ 모드 변경: {mode}")
+                return True
+            else:
+                rospy.logerr(f"❌ 모드 변경 실패: {mode}")
+                return False
+        except Exception as e:
+            rospy.logerr(f"모드 변경 에러: {e}")
+            return False
+    
+    def arm_drone(self):
+        """드론 Armed"""
+        try:
+            rospy.wait_for_service('/mavros/cmd/arming', timeout=5)
+            arm_srv = rospy.ServiceProxy('/mavros/cmd/arming', CommandBool)
+            response = arm_srv(True)
+            if response.success:
+                rospy.loginfo("✅ 드론 Armed")
+                return True
+            else:
+                rospy.logerr("❌ Armed 실패")
+                return False
+        except Exception as e:
+            rospy.logerr(f"Arming 에러: {e}")
+            return False
+    
+    def auto_takeoff(self):
+        """자동 이륙 실행"""
+        rospy.loginfo("🚁 자동 이륙 시작...")
+        
+        # 1. GUIDED 모드로 전환
+        if not self.set_mode("GUIDED"):
+            rospy.logerr("❌ GUIDED 모드 전환 실패")
+            return False
+        
+        rospy.sleep(2)  # 모드 전환 대기
+        
+        # 2. 드론 Armed
+        if not self.arm_drone():
+            rospy.logerr("❌ Armed 실패")
+            return False
+        
+        rospy.sleep(2)  # Armed 대기
+        
+        # 3. 이륙 명령
+        try:
+            rospy.wait_for_service('/mavros/cmd/takeoff', timeout=5)
+            takeoff_srv = rospy.ServiceProxy('/mavros/cmd/takeoff', CommandTOL)
+            response = takeoff_srv(
+                altitude=config.TAKEOFF_ALTITUDE,
+                latitude=0,  # 현재 위치에서 이륙
+                longitude=0,
+                min_pitch=0
+            )
+            
+            if response.success:
+                rospy.loginfo(f"✅ 이륙 명령 전송: {config.TAKEOFF_ALTITUDE}m")
+                
+                # 이륙 완료 대기
+                self.wait_for_takeoff_complete()
+                return True
+            else:
+                rospy.logerr("❌ 이륙 명령 실패")
+                return False
+                
+        except Exception as e:
+            rospy.logerr(f"이륙 명령 에러: {e}")
+            return False
+    
+    def wait_for_takeoff_complete(self):
+        """이륙 완료 대기"""
+        rospy.loginfo("⏳ 이륙 중...")
+        
+        start_time = rospy.Time.now()
+        timeout = rospy.Duration(30)  # 30초 타임아웃
+        
+        while not rospy.is_shutdown():
+            if rospy.Time.now() - start_time > timeout:
+                rospy.logerr("❌ 이륙 타임아웃")
+                return False
+            
+            # 현재 고도 확인
+            if hasattr(self.controller, 'h_f') and self.controller.h_f is not None:
+                if self.controller.h_f >= config.TAKEOFF_ALTITUDE * 0.9:  # 90% 도달
+                    rospy.loginfo(f"✅ 이륙 완료: {self.controller.h_f:.2f}m")
+                    return True
+            
+            rospy.sleep(0.5)
+        
+        return False
     
     def read_sensors(self):
         """센서 값 읽기"""

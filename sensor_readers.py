@@ -147,9 +147,14 @@ class FireDetector:
         temp_score = 0.0
         gas_score = 0.0
         
+        # IR 온도: -10도 이하면 불꽃으로 인식
         if ir_temp is not None:
-            temp_score = min(ir_temp / self.temp_threshold, 1.0) if ir_temp > 0 else 0.0
+            if ir_temp <= self.temp_threshold:  # -10도 이하
+                temp_score = min(abs(ir_temp - self.temp_threshold) / 20.0, 1.0)  # -30도까지 100% 점수
+            else:
+                temp_score = 0.0
         
+        # 가스 농도: 350ppm 이상이면 화재 의심
         if gas_value is not None:
             gas_score = min(gas_value / self.gas_threshold, 1.0) if gas_value > 0 else 0.0
         
