@@ -129,7 +129,7 @@ class FireDetector:
     """
     IR 온도 + Gas 농도 기반 화재 감지
     """
-    def __init__(self, temp_threshold=60.0, gas_threshold=300.0):
+    def __init__(self, temp_threshold= -10.0, gas_threshold=350.0):
         self.temp_threshold = temp_threshold
         self.gas_threshold = gas_threshold
     
@@ -148,7 +148,7 @@ class FireDetector:
         gas_score = 0.0
         
         if ir_temp is not None:
-            temp_score = min(ir_temp / self.temp_threshold, 1.0) if ir_temp > 0 else 0.0
+            temp_score = min(ir_temp / self.temp_threshold, 1.0) if ir_temp < 0 else 0.0
         
         if gas_value is not None:
             gas_score = min(gas_value / self.gas_threshold, 1.0) if gas_value > 0 else 0.0
@@ -156,7 +156,7 @@ class FireDetector:
         # 가중 평균 (온도 70%, 가스 30%)
         confidence = temp_score * 0.7 + gas_score * 0.3
         
-        # 화재 판단 (신뢰도 70% 이상)
-        is_fire = confidence > 0.7
+        # 화재 판단 (신뢰도 60% 이상)
+        is_fire = confidence > 0.6
         
         return is_fire, confidence
